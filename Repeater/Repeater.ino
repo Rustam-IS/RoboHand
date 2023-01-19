@@ -5,7 +5,7 @@
  *   [   50;  180]
  * - Согнуть/разогнуть (aka thy)
  *   [    40;     150]
- * 
+ *  
  * Index (aka ind)
  * - Указательный палец
  * - Согнуть/разогнуть
@@ -31,15 +31,38 @@
 #define THX 10
 
 
-struct Finger {
-  int pin;
-  int b, e;
-  Servo m;
+class Finger {
 
-  void write(int value) {
-    value = map(value, 0, 255, b, e);
-    return m.write(value);
-  }
+  public:
+    int pin;
+    int b, e;
+    Servo m;
+    int cur = -1;
+
+  public:
+
+    Finger(int pin, int b, int e) : 
+      pin(pin), b(b), e(e) {}
+
+    void write(int val, int sm = 7) {
+      val = map(val, 0, 255, b, e);
+      
+      if (cur == -1) {
+        m.write(val);
+        cur = val;
+      } else {    
+        int dif = cur < val ? 1 : -1;
+    
+        for (
+          int st = cur;
+          st != val;
+          st += dif
+        ) {
+          m.write(st);
+          delay(sm);
+        } cur = val;
+      }
+    }
 };
 
 
@@ -52,16 +75,24 @@ Finger fings[] = {
 };
 
 
+const int BUFFER = 2;
+unsigned char buf[BUFFER];
+
+
 void setup() {
   Serial.begin(115200);
 
   for (Finger fing : fings) {
     fing.m.attach(fing.pin);
     fing.write(0);
-  }
+  } 
 }
 
 
 void loop() {
-  delay(100);
+  if (Serial.available() >= BUFFER) {
+    Serial.readBytes(buf, BUFFER);
+    fings[buf[0]].write(buf[1]);
+  }
+  delay(10);
 }
