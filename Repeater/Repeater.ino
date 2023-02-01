@@ -44,6 +44,10 @@ class Finger {
     Finger(int pin, int b, int e) : 
       pin(pin), b(b), e(e) {}
 
+    void attach(int port) {
+      m.attach(port);
+    }
+
     void write(int val, int sm = 7) {
       val = map(val, 0, 255, b, e);
       
@@ -80,19 +84,18 @@ unsigned char buf[BUFFER];
 
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(256000);
 
   for (Finger fing : fings) {
-    fing.m.attach(fing.pin);
+    fing.attach(fing.pin);
     fing.write(0);
   } 
 }
 
 
 void loop() {
-  if (Serial.available() >= BUFFER) {
+  if (Serial.available()) {
     Serial.readBytes(buf, BUFFER);
     fings[buf[0]].write(buf[1]);
   }
-  delay(10);
 }
