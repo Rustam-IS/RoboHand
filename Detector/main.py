@@ -1,47 +1,61 @@
-def scale(x, in_min, in_max, out_min, out_max):
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-
-
 import cv2
-import mediapipe as mp
+from mediapipe.python.solutions import (
+    hands as detect, drawing_utils
+)
 from serial import Serial
+from time import time
+
+
+def scale(x, smn, smx, dmn, dmx):
+    return (x - smn) * (dmx - dmn) / (smx - smn) + dmn
+
+
+def dist(a, b):
+    x = (a.x - b.x) ** 2
+    y = (a.y - b.y) ** 2
+
+    # cos(radians(abs(a.z / 0.17) * 45))
+    # z = (a.z - b.z) ** 2
+    return (x + y) ** (1 / 2)
 
 
 cap = cv2.VideoCapture(0)
-mpHands = mp.solutions.hands
-hands = mpHands.Hands(max_num_hands=4)
-mpDraw = mp.solutions.drawing_utils
+detector = detect.Hands(max_num_hands=1)
 
 serial = Serial(
-    port="COM29",
-    baudrate=115200,
+    port="COM28",
+    baudrate=256000,
 )
 
+last = 0
+cache = [0, 0, 0]
+
 while True:
-    success, image = cap.read()
-    imageRGB = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    results = hands.process(imageRGB)
+    _, image = cap.read()
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # noqa
+    h, w, c = image.shape
 
-    # # checking whether a hand is detected
-    if results.multi_hand_landmarks:
-        for handLms in results.multi_hand_landmarks: # working with each hand
-            for id, lm in enumerate(handLms.landmark):
-                h, w, c = image.shape
-                cx, cy = int(lm.x * w), int(lm.y * h)
+    hands = detector.process(image)
+    hands = hands.multi_hand_landmarks  # noqa
 
-                if id == 8:
-                    a = lm.y
-                    cv2.circle(image, (cx, cy), 25, (255, 0, 255), cv2.FILLED)
+    if hands:
+        for hand in hands:
+            elems = hand.landmark
 
-                if id == 5:
-                    b = lm.y
-                    cv2.circle(image, (cx, cy), 25, (0, 0, 255), cv2.FILLED)
+            ind = dist(elems[5], elems[8])
+            mid = dist(elems[9], elems[12])
+            pik = dist(elems[13], elems[16])
 
-            if 0.04 < b - a < 0.2:
-                serial.write(bytes([2]))
-                serial.write(bytes([int(scale(b - a, 0.04, 0.2, 255, 0))]))  # 0.04 0.2 -> 255 0
+            for n, finger in enumerate([ind, mid, pik]):
+                port, data = [n + 2], [int(scale(finger, 0.02, 0.16, 255, 0))]
+                if 0 <= data[0] <= 255 and abs(cache[n] - data[0]) > 16:
+                    cache[n] = data[0]
+                    # print(*port, finger)
+                    serial.write(bytes(port))
+                    serial.write(bytes(data))  # 0.02 0.14 -> 255 0
 
-            mpDraw.draw_landmarks(image, handLms, mpHands.HAND_CONNECTIONS)
+            drawing_utils.draw_landmarks(image, hand, detect.HAND_CONNECTIONS)
 
-    cv2.imshow("Output", image)
+        cv2.imshow("Output", image)
+
     cv2.waitKey(1)
