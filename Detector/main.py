@@ -43,12 +43,11 @@ cap = cv2.VideoCapture(0)
 detector = detect.Hands(max_num_hands=1)
 
 serial = Serial(
-    port="COM35",
+    port="COM23",
     baudrate=256000,
 )
 
-last = 0
-cache = [0, 0, 0, 0]
+cache = [0, 0, 0, 0, 0]
 
 while True:
     _, image = cap.read()
@@ -64,33 +63,44 @@ while True:
     for hand in hands:
         elems = hand.landmark
 
-        ind = angle(
-            vector(elems[0], elems[5]),
-            vector(elems[5], elems[6]),
-        )
-        mid = angle(
-            vector(elems[0], elems[9]),
-            vector(elems[9], elems[10]),
-        )
-        pik = angle(
-            vector(elems[0], elems[13]),
-            vector(elems[13], elems[14]),
-        )
+        # ind = angle(
+        #     vector(elems[0], elems[5]),
+        #     vector(elems[5], elems[6]),
+        # )
+        # mid = angle(
+        #     vector(elems[0], elems[9]),
+        #     vector(elems[9], elems[10]),
+        # )
+        # pik = angle(
+        #     vector(elems[0], elems[13]),
+        #     vector(elems[13], elems[14]),
+        # )
 
         ind = dist(elems[5], elems[8])
         mid = dist(elems[9], elems[12])
         pik = dist(elems[13], elems[16])
         thy = dist(elems[2], elems[4])
+        thx = abs(elems[4].x - elems[0].x)
 
-        for n, finger in enumerate([ind, mid, pik]):
+        for n, (finger, rng) in enumerate([
+            (thx, (0.060, 0.120)),
+            (thy, (0.120, 0.060)),
+            (ind, (0.030, 0.160)),
+            (mid, (0.055, 0.165)),
+            (pik, (0.060, 0.165)),
+        ]):
             # 0.02 -> 0.16
             # 40 -> 9
-            port, data = [n + 2], [int(scale(finger, 0.02, 0.16, 255, 0))]
+            port, data = [n], [int(scale(finger, *rng, 255, 0))]
+            # if port[0] == 0:
+            #     print(data, finger)
+
             if 0 <= data[0] <= 255 and abs(cache[n] - data[0]) >= 32:
                 cache[n] = data[0]
                 try:
                     serial.write(bytes(port))
                     serial.write(bytes(data))
+                    break
                 except Exception as e:
                     print(e)
 
