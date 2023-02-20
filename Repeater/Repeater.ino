@@ -48,7 +48,7 @@ class Finger {
       m.attach(port);
     }
 
-    void write(int val, int sm = 1) {
+    void write(int val, int sm = 0) {
       val = map(val, 0, 255, b, e);
       
       if (cur == -1) {
@@ -63,7 +63,7 @@ class Finger {
           st += dif
         ) {
           m.write(st);
-          // delay(sm);
+          delay(sm);
         } cur = val;
       }
     }
